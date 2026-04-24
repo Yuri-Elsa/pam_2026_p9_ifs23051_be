@@ -22,6 +22,15 @@ def create_app():
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(recipe_bp, url_prefix="/recipes")
+    
+    @app.route("/")
+    def health_check():
+        from datetime import datetime
+        return {
+            "status": "ok",
+            "message": "RecipeAI backend is running 🍳",
+            "timestamp": datetime.utcnow().isoformat()
+        }, 200
 
     with app.app_context():
         db.create_all()
