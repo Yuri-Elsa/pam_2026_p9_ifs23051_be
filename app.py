@@ -55,4 +55,4 @@ def create_app():
 if __name__ == "__main__":
     app = create_app()
     # debug=False secara eksplisit; gunakan gunicorn untuk production
-    app.run(debug=False, port=8080)
+    app.run(debug=False, port=port)
