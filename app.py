@@ -1,0 +1,49 @@
+import os
+from flask import Flask
+from flask_cors import CORS
+from config import Config
+from extensions import db, jwt, limiter
+
+
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object(Config)
+
+    db.init_app(app)
+    jwt.init_app(app)
+    limiter.init_app(app)
+
+    allowed_origins = os.environ.get("ALLOWED_ORIGINS", "").split(",")
+    allowed_origins = [o.strip() for o in allowed_origins if o.strip()]
+    CORS(app, origins=allowed_origins if allowed_origins else "*")
+
+    from routes.auth_routes import auth_bp
+    from routes.recipe_routes import recipe_bp
+
+    app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(recipe_bp, url_prefix="/recipes")
+
+    with app.app_context():
+        db.create_all()
+
+        from models.user import User
+        from werkzeug.security import generate_password_hash
+
+        if not User.query.filter_by(username="admin").first():
+            admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+            admin = User(
+                username="admin",
+                password=generate_password_hash(admin_password),
+                is_admin=True
+            )
+            db.session.add(admin)
+            db.session.commit()
+            print("[SEED] Admin account created.")
+
+    return app
+
+
+if __name__ == "__main__":
+    app = create_app()
+    # debug=False secara eksplisit; gunakan gunicorn untuk production
+    app.run(debug=False, port=8080)
