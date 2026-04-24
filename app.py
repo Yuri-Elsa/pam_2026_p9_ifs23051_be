@@ -54,5 +54,5 @@ def create_app():
 
 if __name__ == "__main__":
     app = create_app()
-    port = int(os.environ.get("PORT", 8080))
+    port = int(os.environ.get("PORT", 31114))  # ganti default ke 31114
     app.run(debug=False, port=port)
