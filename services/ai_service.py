@@ -5,19 +5,14 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a professional chef and nutritionist. 
-When given a list of ingredients, you generate ONE complete recipe and calculate the calorie count.
-
-You MUST respond ONLY with valid JSON, no markdown, no explanation, just raw JSON like this:
+SYSTEM_PROMPT = """You are a chef. Given ingredients, create ONE recipe.
+Respond ONLY with valid JSON, no markdown, no explanation:
 {
   "title": "Recipe Title",
   "servings": 2,
-  "steps": "Step 1: ...\nStep 2: ...\nStep 3: ...",
-  "calories_detail": [
-    {"ingredient": "rice", "amount": "100g", "calories": 130},
-    {"ingredient": "egg", "amount": "2 pcs", "calories": 156}
-  ],
-  "calories_total": 286
+  "steps": "Step 1: ...\nStep 2: ...",
+  "calories_detail": [{"ingredient": "rice", "amount": "100g", "calories": 130}],
+  "calories_total": 130
 }"""
 
 REQUIRED_KEYS = {"title", "steps", "calories_total", "calories_detail", "servings"}
@@ -54,14 +49,8 @@ def _validate_result(result: dict) -> dict:
 def generate_recipe(ingredients: list[str]) -> dict:
     ingredients_str = ", ".join(ingredients)
 
-    prompt = f"""{SYSTEM_PROMPT}
+    prompt = f"{SYSTEM_PROMPT}\n\nIngredients: {ingredients_str}"
 
-Please create a recipe using these ingredients: {ingredients_str}
-
-Calculate the calorie content for each ingredient used and the total calories.
-Respond ONLY with JSON, no extra text."""
-
-    # Format API delcom.org: token di body, pesan di field "chat"
     payload = {
         "token": Config.LLM_TOKEN,
         "chat": prompt
@@ -82,9 +71,7 @@ Respond ONLY with JSON, no extra text."""
     # Ambil content dari response delcom.org
     content = None
     if isinstance(data, dict):
-        # Kemungkinan 1: {"response": "..."}
         content = data.get("response") or data.get("message") or data.get("content") or data.get("text")
-        # Kemungkinan 2: OpenAI-style {"choices": [{"message": {"content": "..."}}]}
         if not content and "choices" in data:
             content = data["choices"][0]["message"]["content"]
     elif isinstance(data, str):
