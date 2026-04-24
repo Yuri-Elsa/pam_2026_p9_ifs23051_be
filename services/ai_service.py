@@ -29,7 +29,6 @@ def _validate_result(result: dict) -> dict:
     if missing:
         raise ValueError(f"Incomplete JSON from LLM — missing keys: {missing}")
 
-    # Type coercions & sanity checks
     result["title"] = str(result["title"]).strip() or "Generated Recipe"
     result["steps"] = str(result["steps"]).strip()
     result["servings"] = max(1, int(result.get("servings", 1)))
@@ -38,7 +37,6 @@ def _validate_result(result: dict) -> dict:
     if not isinstance(result["calories_detail"], list):
         raise ValueError("calories_detail must be a list")
 
-    # Ensure each detail entry has expected sub-keys
     sanitized_detail = []
     for item in result["calories_detail"]:
         if not isinstance(item, dict):
@@ -56,29 +54,21 @@ def _validate_result(result: dict) -> dict:
 def generate_recipe(ingredients: list[str]) -> dict:
     ingredients_str = ", ".join(ingredients)
 
-    user_message = f"""Please create a recipe using these ingredients: {ingredients_str}
+    prompt = f"""{SYSTEM_PROMPT}
+
+Please create a recipe using these ingredients: {ingredients_str}
 
 Calculate the calorie content for each ingredient used and the total calories.
 Respond ONLY with JSON, no extra text."""
 
-    headers = {
-        "Authorization": f"Bearer {Config.LLM_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
+    # Format API delcom.org: token di body, pesan di field "chat"
     payload = {
-        "model": Config.LLM_MODEL,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
-        ],
-        "temperature": 0.7,
-        "max_tokens": 1500
+        "token": Config.LLM_TOKEN,
+        "chat": prompt
     }
 
     response = requests.post(
-        f"{Config.LLM_BASE_URL}/chat/completions",
-        headers=headers,
+        f"{Config.LLM_BASE_URL}/llm/chat",
         json=payload,
         timeout=60
     )
@@ -88,7 +78,21 @@ Respond ONLY with JSON, no extra text."""
         raise Exception("LLM API returned non-200 status")
 
     data = response.json()
-    content = data["choices"][0]["message"]["content"]
+
+    # Ambil content dari response delcom.org
+    content = None
+    if isinstance(data, dict):
+        # Kemungkinan 1: {"response": "..."}
+        content = data.get("response") or data.get("message") or data.get("content") or data.get("text")
+        # Kemungkinan 2: OpenAI-style {"choices": [{"message": {"content": "..."}}]}
+        if not content and "choices" in data:
+            content = data["choices"][0]["message"]["content"]
+    elif isinstance(data, str):
+        content = data
+
+    if not content:
+        logger.error("Unexpected LLM response structure: %s", str(data)[:500])
+        raise ValueError("Cannot extract content from LLM response")
 
     # Strip markdown code fences if present
     content = content.strip()
