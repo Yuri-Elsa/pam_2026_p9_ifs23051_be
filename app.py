@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()  # HARUS paling atas, sebelum import Config
+
 import os
 import logging
 from flask import Flask
