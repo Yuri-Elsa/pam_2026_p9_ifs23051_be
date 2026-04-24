@@ -16,6 +16,16 @@ class Recipe(db.Model):
 
     def to_dict(self):
         import json
+
+        calories_detail = []
+        if self.calories_detail:
+            try:
+                calories_detail = json.loads(self.calories_detail)
+                if not isinstance(calories_detail, list):
+                    calories_detail = []
+            except (json.JSONDecodeError, ValueError):
+                calories_detail = []
+
         return {
             "id": self.id,
             "user_id": self.user_id,
@@ -23,7 +33,7 @@ class Recipe(db.Model):
             "title": self.title,
             "steps": self.steps,
             "calories_total": self.calories_total,
-            "calories_detail": json.loads(self.calories_detail) if self.calories_detail else [],
+            "calories_detail": calories_detail,
             "servings": self.servings,
             "created_at": self.created_at.isoformat()
         }

@@ -1,13 +1,20 @@
 import os
+import logging
 from flask import Flask
 from flask_cors import CORS
 from config import Config
 from extensions import db, jwt, limiter
 
+logger = logging.getLogger(__name__)
+
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # Tampilkan warning konfigurasi saat startup
+    for warning in Config.validate():
+        logger.warning("[CONFIG] %s", warning)
 
     db.init_app(app)
     jwt.init_app(app)
@@ -22,7 +29,7 @@ def create_app():
 
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(recipe_bp, url_prefix="/recipes")
-    
+
     @app.route("/")
     def health_check():
         from datetime import datetime
@@ -47,12 +54,13 @@ def create_app():
             )
             db.session.add(admin)
             db.session.commit()
-            print("[SEED] Admin account created.")
+            logger.info("[SEED] Admin account created.")
 
     return app
 
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
     app = create_app()
-    port = int(os.environ.get("PORT", 31114))  # ganti default ke 31114
+    port = int(os.environ.get("PORT", 31114))
     app.run(debug=False, port=port)

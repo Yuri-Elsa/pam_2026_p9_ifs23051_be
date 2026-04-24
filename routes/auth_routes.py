@@ -2,6 +2,7 @@ import logging
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import check_password_hash
+from extensions import db
 from models.user import User
 
 logger = logging.getLogger(__name__)
@@ -33,7 +34,8 @@ def login():
 @jwt_required()
 def me():
     user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
+    # db.session.get() adalah cara yang benar di SQLAlchemy 2.x
+    user = db.session.get(User, user_id)
 
     if not user:
         return jsonify({"message": "User not found"}), 404

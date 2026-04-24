@@ -20,6 +20,38 @@ You MUST respond ONLY with valid JSON, no markdown, no explanation, just raw JSO
   "calories_total": 286
 }"""
 
+REQUIRED_KEYS = {"title", "steps", "calories_total", "calories_detail", "servings"}
+
+
+def _validate_result(result: dict) -> dict:
+    """Validate and sanitize the LLM JSON response."""
+    missing = REQUIRED_KEYS - result.keys()
+    if missing:
+        raise ValueError(f"Incomplete JSON from LLM — missing keys: {missing}")
+
+    # Type coercions & sanity checks
+    result["title"] = str(result["title"]).strip() or "Generated Recipe"
+    result["steps"] = str(result["steps"]).strip()
+    result["servings"] = max(1, int(result.get("servings", 1)))
+    result["calories_total"] = float(result.get("calories_total", 0))
+
+    if not isinstance(result["calories_detail"], list):
+        raise ValueError("calories_detail must be a list")
+
+    # Ensure each detail entry has expected sub-keys
+    sanitized_detail = []
+    for item in result["calories_detail"]:
+        if not isinstance(item, dict):
+            continue
+        sanitized_detail.append({
+            "ingredient": str(item.get("ingredient", "")).strip(),
+            "amount":     str(item.get("amount", "")).strip(),
+            "calories":   float(item.get("calories", 0)),
+        })
+    result["calories_detail"] = sanitized_detail
+
+    return result
+
 
 def generate_recipe(ingredients: list[str]) -> dict:
     ingredients_str = ", ".join(ingredients)
@@ -52,7 +84,6 @@ Respond ONLY with JSON, no extra text."""
     )
 
     if response.status_code != 200:
-        # Log detail untuk debugging server-side, jangan expose ke client
         logger.error("LLM API error: status=%s body=%s", response.status_code, response.text[:500])
         raise Exception("LLM API returned non-200 status")
 
@@ -67,5 +98,10 @@ Respond ONLY with JSON, no extra text."""
             content = content[4:]
     content = content.strip()
 
-    result = json.loads(content)
-    return result
+    try:
+        result = json.loads(content)
+    except json.JSONDecodeError as e:
+        logger.error("LLM returned invalid JSON: %s | raw content: %s", e, content[:500])
+        raise ValueError("LLM returned invalid JSON") from e
+
+    return _validate_result(result)
